@@ -7,15 +7,17 @@ This is a modified version of [Twitch Utils by SpacersVIP](https://greasyfork.or
 ## Install
 
 1. Install a userscript manager such as [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/).
-2. Open the script link below and confirm the install:
+2. Open the script link and confirm the install: [twitch-utils.user.js](https://raw.githubusercontent.com/nicolaspaillard/Twitch-Utils/main/twitch-utils.user.js)
 
-   [twitch-utils.user.js](https://raw.githubusercontent.com/nicolaspaillard/Twitch-Utils/main/twitch-utils.user.js)
-
-The script updates itself when the `@version` number in the file goes up.
+_The script updates itself._
 
 ## Usage
 
 Press the menu key on any Twitch page to open or close the panel. The default key is `²`, and you can change it from the panel's Layout section. The panel can be dragged, and each section can be folded.
+
+## Import settings
+
+A ready-to-import [settings.json](settings.json) is included. Open the Twitch Utils panel, use the import option in the settings menu, and paste the contents of that file.
 
 ## Features
 
