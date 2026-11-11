@@ -27,6 +27,7 @@ A ready-to-import [settings.json](settings.json) is included. Open the Twitch Ut
 - Compressor ("Leveling") with a live gain-reduction meter
 - Bass shelf and mono downmix
 - Auto gain: reads Twitch's own per-channel loudness value and sets the gain to reach a target level you choose
+- Optional mute the stream while the tab is in the background
 
 **Quality**
 

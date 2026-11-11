@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Twitch Utils
 // @namespace    nicolaspaillard.twitch.utils
-// @version      5.0.2
+// @version      5.0.3
 // @description  Keybind-toggled utility HUD for Twitch, modified for VAFT support — Web Audio chain (gain to 500%, compressor, bass shelf, mono, loudness-derived auto gain), player-core stats and latency control, quality pinning, ad mute/blank, auto-claim, cast, screenshot, PiP.
 // @author       Viper (original), nicolaspaillard
 // @license      MIT
@@ -80,6 +80,7 @@
     // automation
     pinned: null, // quality name to hold, or null for auto
     bgQuality: false, // drop to the bottom of the ladder while the tab is hidden
+    bgMute: false, // mute the stream while the tab is hidden
     autoClaim: true,
     autoDismiss: true,
     // points dashboard / lurk
@@ -400,7 +401,14 @@
      tab, audio focus loss), and if that happens while we're hooked, playback
      stalls again. This has to stay live for the life of the page. */
   function armVisibility() {
-    window.addEventListener("visibilitychange", () => bgApply(tabHidden()), true);
+    window.addEventListener(
+      "visibilitychange",
+      () => {
+        bgApply(tabHidden());
+        bgMuteApply(tabHidden());
+      },
+      true,
+    );
   }
 
   function armGesture() {
@@ -1342,7 +1350,8 @@
     const v = getVideo();
     if (!v) return false; // caller must NOT clear state on false
     if (mutedByUs) {
-      v.muted = priorMuted === true; // null/undefined -> unmuted, never stuck
+      // stay muted if the hidden-tab mute (bgMute) still owns it
+      v.muted = preBgMute !== null || priorMuted === true; // null/undefined -> unmuted, never stuck
       mutedByUs = false;
       priorMuted = null;
     }
@@ -1357,7 +1366,8 @@
     const v = getVideo();
     if (!v) return;
     if (cfg.adMute && !mutedByUs) {
-      priorMuted = v.muted;
+      // if bgMute already muted it, the real prior state is the one it saved
+      priorMuted = preBgMute ? preBgMute.was : v.muted;
       v.muted = true;
       mutedByUs = true;
     }
@@ -1432,6 +1442,7 @@
       v.muted ? "color:#ffb44d;font-weight:bold" : "color:#00e08a;font-weight:bold",
       {
         byUs: mutedByUs,
+        bgMuted: preBgMute !== null,
         adOn: S.adOn,
         adEvent: S.adEvent,
         priorMuted,
@@ -1677,6 +1688,31 @@
       }
     } catch {
       bgSwitching = false;
+    }
+  }
+
+  /* ─── BACKGROUND MUTE ──────────────────────────────────────────
+     Same shape as bgApply: opt-in via cfg.bgMute, one state variable
+     (preBgMute, null = not applied), converged from slow() in case the
+     visibilitychange event is missed.
+
+     It shares the video's muted flag with the ad logic, so the two hand off
+     instead of fighting: if an ad owns the mute when we hide, we save the
+     ad's prior state; if an ad ends while we're hidden, restoreAudio() keeps
+     it muted because preBgMute is still set. */
+  let preBgMute = null; // null = not applied; otherwise { was } = mute state to restore
+
+  function bgMuteApply(hidden) {
+    if (!cfg.bgMute) return;
+    const v = getVideo();
+    if (!v) return;
+    if (hidden && preBgMute === null) {
+      // if an ad owns the mute, the real prior state is the one it saved
+      preBgMute = { was: mutedByUs ? priorMuted === true : v.muted };
+      v.muted = true;
+    } else if (!hidden && preBgMute !== null) {
+      if (!mutedByUs) v.muted = preBgMute.was; // an ad still owns it: restoreAudio handles it
+      preBgMute = null;
     }
   }
 
@@ -2411,6 +2447,7 @@
         Pinning removes the dropped-frame and viewport filters from the loop
       </div>
       ${row("bgQuality", "Low quality when hidden", "For running several tabs at once")}
+      ${row("bgMute", "Mute when hidden", "Sound off while you're in another tab")}
 
       <div class="vtu-sec" data-sec="points">Points</div>
       <div class="vtu-slide">
@@ -2780,6 +2817,7 @@
       if (!cfg[k] && preBg !== null) bgApply(false);
       else bgApply(tabHidden());
     }
+    if (k === "bgMute") bgMuteApply(tabHidden());
     if (k === "lurkHidden") paintLurk();
     if (k === "lowLatency") {
       llWarned = false;
@@ -3024,6 +3062,9 @@
     if (cfg.bgQuality && (tabHidden() ? preBg === null : preBg !== null)) {
       bgApply(tabHidden());
     }
+    if (cfg.bgMute && (tabHidden() ? preBgMute === null : preBgMute !== null)) {
+      bgMuteApply(tabHidden());
+    }
     autoGain();
     hookAudio(); // re-hooks after Twitch swaps the video element
     audioWatchdog();
@@ -3050,6 +3091,7 @@
         mutedByUs = false;
         priorMuted = null;
       } // don't carry a mute across
+      preBgMute = null;
       S.adOn = false;
       domClear = 0;
       ST.lat = null;
